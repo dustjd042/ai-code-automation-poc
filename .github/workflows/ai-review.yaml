@@ -2,18 +2,16 @@ name: AI Planning Review
 
 on:
   workflow_run:
-    workflows: [Codex Issue Planning]
+    workflows: [Codex Issue Planning, Codex Issue Implementation]
     types: [completed]
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'Planning PR number to review'
+        description: 'Planning or development PR number to review'
         required: true
         type: string
   pull_request_target:
     types: [opened, synchronize, reopened]
-    paths:
-      - 'docs/plan/**/*.md'
 
 permissions:
   actions: read
@@ -24,7 +22,9 @@ jobs:
   resolve:
     if: >-
       github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.conclusion == 'success' &&
+      ((github.event.workflow_run.conclusion == 'success' ||
+        (github.event.workflow_run.name == 'Codex Issue Implementation' &&
+         github.event.workflow_run.conclusion == 'failure')) &&
        github.event.workflow_run.head_repository.full_name == github.repository &&
        github.event.workflow_run.head_branch == github.event.repository.default_branch)
     runs-on: ubuntu-latest
@@ -40,15 +40,18 @@ jobs:
             const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
               ...context.repo, run_id: context.payload.workflow_run.id, per_page: 100
             });
-            const artifact = artifacts.find(a => a.name === 'planning-pr' && !a.expired);
+            const name = context.payload.workflow_run.name === 'Codex Issue Implementation'
+              ? 'development-pr' : 'planning-pr';
+            const artifact = artifacts.find(a => a.name === name && !a.expired);
             core.setOutput('found', Boolean(artifact));
-            if (!artifact) core.notice('No planning PR artifact; skipping review.');
+            core.setOutput('name', name);
+            if (!artifact) core.notice('No PR artifact; skipping review.');
 
       - name: Download planning PR number
         if: steps.artifact.outputs.found == 'true'
         uses: actions/download-artifact@v4
         with:
-          name: planning-pr
+          name: ${{ steps.artifact.outputs.name }}
           path: ${{ runner.temp }}/review-trigger
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}

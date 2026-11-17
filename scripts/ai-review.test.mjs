@@ -6,8 +6,9 @@ const env = { GITHUB_TOKEN: 'github-test', OPENAI_API_KEY: 'openai-test', PR_NUM
 function fixture(options = {}) {
   const calls = [];
   let reads = 0;
-  const pr = { state: options.closed ? 'closed' : 'open', title: '계획',
-    head: { sha: 'abc123', repo: { full_name: options.fork ? 'other/repo' : env.REPOSITORY } } };
+  let aiCalls = 0;
+  const pr = { state: options.closed ? 'closed' : 'open', title: '계획', body: '이번 PR 범위',
+    head: { ref: options.code ? 'codex/implement-1' : 'codex/plan-1', sha: 'abc123', repo: { full_name: options.fork ? 'other/repo' : env.REPOSITORY } } };
   const fetchMock = async (url, request) => {
     const body = request.body && JSON.parse(request.body);
     calls.push({ url, ...request, body });
@@ -17,17 +18,21 @@ function fixture(options = {}) {
       data = structuredClone(pr);
       if (options.changed && reads > 1) data.head.sha = 'newsha';
     } else if (url.includes('/pulls/12/files?')) {
-      data = options.noPlans ? [] : [{ filename: 'docs/plan/issue-1.md', status: 'added' }];
+      data = options.noPlans ? [] : [{ filename: options.code ? 'src/main/App.java' : 'docs/plan/issue-1.md', status: options.removed ? 'removed' : 'added', patch: options.noPatch ? undefined : '@@ -1 +1 @@\n-old\n+new' }];
     } else if (url.includes('/contents/')) {
       assert.ok(url.endsWith('?ref=abc123'));
       data = { type: 'file', encoding: 'base64', content: Buffer.from('계획 내용').toString('base64') };
     } else if (url === 'https://api.openai.com/v1/responses') {
       assert.equal(request.headers.Authorization, 'Bearer openai-test');
-      assert.ok(body.input.includes('계획 내용'));
+      aiCalls++;
+      const input = JSON.parse(body.input);
+      assert.equal(input.description, '이번 PR 범위');
+      assert.ok(input.documents[0].patch || options.noPatch);
+      if (!options.code) assert.ok(body.input.includes('계획 내용'));
       assert.equal(body.tools, undefined);
       if (options.apiError) return { ok: false, status: 429 };
       data = { status: options.incomplete ? 'incomplete' : 'completed',
-        output: [{ type: 'message', content: [{ type: 'output_text', text: options.empty ? '' : '테스트 계획을 보완하세요.' }] }] };
+        output: [{ type: 'message', content: [{ type: 'output_text', text: options.empty ? '' : (options.alwaysLong || (options.longOnce && aiCalls === 1)) ? '가'.repeat(401) : '테스트 계획을 보완하세요.' }] }] };
     } else if (url.includes('/comments?')) {
       if (options.paginated && url.endsWith('page=1')) {
         data = Array.from({ length: 100 }, (_, id) => ({ id, body: 'unrelated', user: { login: 'human' } }));
@@ -56,7 +61,7 @@ test('creates a review without overwriting a human marker comment', async () => 
   assert.deepEqual(posted.map(c => c.body.body.split('\n')[0]), ['[개발 팀장]', '[기획 팀장]', '[운영 팀장]']);
   const prompts = f.calls.filter(c => c.url.includes('api.openai.com')).map(c => c.body.instructions);
   assert.equal(prompts.length, 3);
-  ROLES.forEach((role, index) => assert.ok(prompts[index].includes(role.criteria)));
+  ROLES.forEach((role, index) => assert.ok(prompts[index].includes(role.criteria) && prompts[index].includes(role.personality)));
 });
 
 test('finds an existing bot comment on a later page and updates it', async () => {
@@ -102,4 +107,38 @@ test('rejects malformed PR numbers before any request', async () => {
   assert.deepEqual(writes.map(c => c.method), ['PATCH', 'POST', 'POST']);
   assert.ok(writes[0].url.endsWith('/issues/comments/98'));
   assert.ok(writes[0].body.body.startsWith('[개발 팀장]'));
+});
+
+for (const removed of [false, true]) {
+  test(`development PR reviews code diff with only the development lead (removed=${removed})`, async () => {
+    const f = fixture({ code: true, removed });
+    assert.equal(await reviewPlan(env, f.fetchMock), 'published 1 role review comments');
+    const ai = f.calls.filter(c => c.url.includes('api.openai.com'));
+    assert.equal(ai.length, 1);
+    assert.ok(ai[0].body.instructions.includes('개발 PR 코드 리뷰'));
+    assert.equal(JSON.parse(ai[0].body.input).documents[0].path, 'src/main/App.java');
+    assert.ok(!f.calls.some(c => c.url.includes('/contents/')));
+    assert.ok(f.calls.at(-1).body.body.startsWith('[개발 팀장]'));
+  });
+}
+
+test('missing code diff fails without an unsupported OK review', async () => {
+  const f = fixture({ code: true, noPatch: true });
+  await assert.rejects(reviewPlan(env, f.fetchMock), /Code diff unavailable/);
+  assert.ok(f.calls.every(c => c.method === 'GET'));
+});
+
+test('rewrites an overlong draft before publishing', async () => {
+  const f = fixture({ longOnce: true });
+  await reviewPlan(env, f.fetchMock);
+  const ai = f.calls.filter(c => c.url.includes('api.openai.com'));
+  assert.equal(ai.length, 4);
+  assert.equal(JSON.parse(ai[1].body.input).previousDraft.length, 401);
+  assert.ok(!f.calls.at(-1).body.body.includes('검토 커밋:'));
+});
+
+test('never publishes a review still over the length limit after retry', async () => {
+  const f = fixture({ alwaysLong: true });
+  await assert.rejects(reviewPlan(env, f.fetchMock), /exceeds 400/);
+  assert.ok(!f.calls.some(c => c.url.includes('/comments')));
 });

@@ -78,12 +78,28 @@ For an existing PR, use **Actions → AI Planning Review → Run workflow** on t
 default branch and enter `pr_number`. Repeated reviews update the bot's existing
 comments, one each beginning with `[개발 팀장]`, `[기획 팀장]`, and
 `[운영 팀장]`. Each role uses its own review criteria and one model request
-(three requests per run). A result is discarded if the PR changes or closes during generation.
+(three requests per run). The development lead is direct and pragmatic, the
+planning lead is curious and user-focused, and the operations lead is calm and
+practical about failure scenarios. Feedback is scoped to this PR, with at most
+two points and a target of 300 characters (hard limit: 400 body characters).
+No findings means `OK`. An overlong draft is rewritten once; if still too long,
+the job fails without publishing it. A result is discarded if the PR changes or
+closes during generation.
+
+Development PRs from `codex/implement-<issue number>` receive only a
+`[개발 팀장]` code review comment, based on changed code diffs (including deletions).
+The implementation workflow uploads a `development-pr` artifact after creating
+the PR. The review workflow consumes it even if the implementation run ultimately
+fails its test-result check. No artifact means no review. Human updates and manual
+review runs also support these development branches. The workflow retains its
+existing **AI Planning Review** name in Actions.
 
 The script executes only from the default branch and reads plan contents at the
-PR head commit through the GitHub API. It sends the PR title and changed plan
-contents to the OpenAI Responses API; it does not execute PR code. Reviews are
-limited to 20 documents and 120 KB total and do not inspect application code.
+PR head commit through the GitHub API. It sends the PR title, description, and
+plan contents with patches (or code diffs for development PRs) to the OpenAI
+Responses API; it does not execute PR code. Reviews are limited to 20 files and
+120 KB total. Code reviews exclude `docs/`, `.github/`, `.agents/`, and `.codex/`;
+missing code patches fail the job rather than producing an unsupported review.
 API failures or incomplete responses fail the job without posting a comment.
 
 Run the review tests without credentials or external API calls:

@@ -150,6 +150,22 @@ jobs:
             Please review before merging.
             No automatic merge is performed.
 
+      - name: Save development PR number
+        if: steps.pr.outputs.pull-request-number != ''
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.pull-request-number }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/review-trigger"
+          printf '%s\n' "$PR_NUMBER" > "$RUNNER_TEMP/review-trigger/pr-number.txt"
+
+      - name: Upload development review trigger
+        if: steps.pr.outputs.pull-request-number != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: development-pr
+          path: ${{ runner.temp }}/review-trigger/pr-number.txt
+          retention-days: 7
+
       - name: Verify PR was created
         env:
           PR_URL: ${{ steps.pr.outputs.pull-request-url }}
