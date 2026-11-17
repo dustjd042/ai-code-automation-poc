@@ -6,7 +6,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    environment: test  # 추가된 부분
+    environment: test
 
     steps:
       - name: Checkout repository
@@ -17,6 +17,11 @@ jobs:
 
       - name: Test Codex
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CODEX_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
+          if [ -z "$CODEX_API_KEY" ]; then
+            echo "ERROR: API key is missing"
+            exit 1
+          fi
+
           codex exec "Reply with Hello World only."
