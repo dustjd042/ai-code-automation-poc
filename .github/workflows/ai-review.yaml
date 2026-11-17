@@ -1,22 +1,89 @@
 name: AI Planning Review
 
 on:
+  workflow_run:
+    workflows: [Codex Issue Planning]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Planning PR number to review'
+        required: true
+        type: string
   pull_request_target:
     types: [opened, synchronize, reopened]
     paths:
       - 'docs/plan/**/*.md'
 
 permissions:
+  actions: read
   contents: read
   pull-requests: write
 
 jobs:
-  ai-review:
+  resolve:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_branch == github.event.repository.default_branch)
     runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.pr.outputs.number }}
+    steps:
+      - name: Find planning artifact
+        if: github.event_name == 'workflow_run'
+        id: artifact
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              ...context.repo, run_id: context.payload.workflow_run.id, per_page: 100
+            });
+            const artifact = artifacts.find(a => a.name === 'planning-pr' && !a.expired);
+            core.setOutput('found', Boolean(artifact));
+            if (!artifact) core.notice('No planning PR artifact; skipping review.');
+
+      - name: Download planning PR number
+        if: steps.artifact.outputs.found == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: planning-pr
+          path: ${{ runner.temp }}/review-trigger
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Resolve PR number
+        id: pr
+        if: github.event_name != 'workflow_run' || steps.artifact.outputs.found == 'true'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR: ${{ github.event.pull_request.number || inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="$EVENT_PR"
+          if [ "$EVENT_NAME" = workflow_run ]; then
+            PR_NUMBER="$(cat "$RUNNER_TEMP/review-trigger/pr-number.txt")"
+          fi
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'Invalid PR number'; exit 1; }
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+  ai-review:
+    needs: resolve
+    if: needs.resolve.outputs.pr_number != ''
+    runs-on: ubuntu-latest
+    environment: test
+    timeout-minutes: 10
+    concurrency:
+      group: ai-plan-review-${{ needs.resolve.outputs.pr_number }}
+      cancel-in-progress: false
 
     steps:
       - name: Checkout trusted scripts
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -27,6 +94,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          OPENAI_MODEL: ${{ vars.OPENAI_REVIEW_MODEL || 'gpt-5-mini' }}
+          PR_NUMBER: ${{ needs.resolve.outputs.pr_number }}
           REPOSITORY: ${{ github.repository }}
         run: node scripts/ai-review.mjs
