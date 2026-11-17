@@ -1,4 +1,3 @@
-
 name: Codex CLI Test
 
 on:
@@ -7,6 +6,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    environment: test  # 추가된 부분
 
     steps:
       - name: Checkout repository
