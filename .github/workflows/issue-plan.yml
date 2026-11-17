@@ -98,6 +98,22 @@ jobs:
             Please review the requirements, implementation plan, and test plan.
             No development or automatic merge is performed.
 
+      - name: Save PR number
+        if: steps.create_pr.outputs.pull-request-number != ''
+        env:
+          PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/review-trigger"
+          printf '%s\n' "$PR_NUMBER" > "$RUNNER_TEMP/review-trigger/pr-number.txt"
+
+      - name: Upload review trigger
+        if: steps.create_pr.outputs.pull-request-number != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: planning-pr
+          path: ${{ runner.temp }}/review-trigger/pr-number.txt
+          retention-days: 7
+
       - name: Show PR URL
         if: steps.create_pr.outputs.pull-request-url != ''
         env:
