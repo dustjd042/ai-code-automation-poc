@@ -25,6 +25,15 @@ curl -i http://localhost:8080/api/hello
 exactly `Hello World` without quotes, JSON wrapping, or a trailing newline.
 No query parameters or request body are needed.
 
+```sh
+curl -i http://localhost:8080/api/healthcheck
+```
+
+`GET /api/healthcheck` returns status `200 OK`, a `text/plain` content type,
+and exactly `healthcheck` without quotes, JSON wrapping, spaces, or a trailing
+newline. No query parameters or request body are needed. This endpoint provides
+a basic liveness check and does not check databases or external services.
+
 ## Test and package
 
 ```sh
@@ -33,4 +42,4 @@ java -jar target/hello-api-0.0.1-SNAPSHOT.jar
 ```
 
 Tests check the HTTP status, exact response bytes, plain-text content type,
-and application context startup with the controller registered.
+and application context startup with both controllers registered.
