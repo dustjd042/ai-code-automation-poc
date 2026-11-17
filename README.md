@@ -26,6 +26,20 @@ exactly `Hello World` without quotes, JSON wrapping, or a trailing newline.
 No query parameters or request body are needed.
 
 ```sh
+curl -i http://localhost:8080/api/hello \
+  -H 'Content-Type: text/plain; charset=UTF-8' \
+  --data-binary 'こんにちは'
+```
+
+`POST /api/hello` accepts exactly the Japanese greeting `こんにちは` as a
+UTF-8 plain-text body. It returns `200 OK`, `text/plain;charset=UTF-8`, and
+exactly `Hello` without quotes, JSON wrapping, spaces, or a trailing newline.
+Missing or empty bodies and other strings return `400 Bad Request`, including
+`고니찌와`, `안녕`, and input with surrounding whitespace or newlines. Input is
+not trimmed or Unicode-normalized. Unsupported content types such as
+`application/json` return `415 Unsupported Media Type`.
+
+```sh
 curl -i http://localhost:8080/api/healthcheck
 ```
 
