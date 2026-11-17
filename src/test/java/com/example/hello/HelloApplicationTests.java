@@ -1,5 +1,6 @@
 package com.example.hello;
 
+import com.example.hello.controller.AnimalSoundController;
 import com.example.hello.controller.HelloController;
 import com.example.hello.controller.HealthcheckController;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ class HelloApplicationTests {
 
     @Test
     void contextLoadsWithApiControllers() {
+        assertThat(context.getBean(AnimalSoundController.class)).isNotNull();
         assertThat(context.getBean(HelloController.class)).isNotNull();
         assertThat(context.getBean(HealthcheckController.class)).isNotNull();
     }
