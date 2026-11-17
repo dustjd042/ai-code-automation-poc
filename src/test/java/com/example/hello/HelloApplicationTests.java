@@ -1,6 +1,7 @@
 package com.example.hello;
 
 import com.example.hello.controller.HelloController;
+import com.example.hello.controller.HealthcheckController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,7 +16,8 @@ class HelloApplicationTests {
     private ApplicationContext context;
 
     @Test
-    void contextLoadsWithHelloController() {
+    void contextLoadsWithApiControllers() {
         assertThat(context.getBean(HelloController.class)).isNotNull();
+        assertThat(context.getBean(HealthcheckController.class)).isNotNull();
     }
 }
