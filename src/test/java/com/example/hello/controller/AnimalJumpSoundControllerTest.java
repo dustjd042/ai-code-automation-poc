@@ -38,7 +38,9 @@ class AnimalJumpSoundControllerTest {
         var uri = UriComponentsBuilder.fromPath("/api/animals/{animal}/jump-sound")
                 .buildAndExpand(animal).encode().toUri();
         mockMvc.perform(post(uri))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().bytes("{\"message\":\"요청한 대상을 찾을 수 없습니다.\"}".getBytes(UTF_8)));
     }
 
     @Test

@@ -62,8 +62,7 @@ Only the lowercase identifiers `dog` and `cat` are supported. Other values,
 including `Dog`, `CAT`, `강아지`, `고양이`, and values with surrounding whitespace,
 return `404 Not Found`. A missing identifier (`/api/animals/sound`) also returns
 404. POST returns `405 Method Not Allowed`, and requesting only
-`Accept: application/json` returns `406 Not Acceptable`. Error response bodies
-are not part of the API contract.
+`Accept: application/json` returns `406 Not Acceptable`. See the error response contract below.
 
 ```sh
 curl -i -X POST http://localhost:8080/api/animals/turtle/jump-sound
@@ -83,7 +82,25 @@ other identifiers, Korean aliases, and surrounding whitespace return `404 Not Fo
 A missing identifier (`/api/animals/jump-sound`) also returns 404.
 GET and other unsupported methods return `405 Method Not Allowed`.
 `Accept: application/json` returns `406 Not Acceptable`.
-Error response bodies are not part of the API contract.
+See the error response contract below.
+
+## Error responses
+
+Invalid greetings and missing or empty required bodies return `400` with
+`{"message":"잘못된 요청입니다."}`. Unsupported animal identifiers return `404`
+with `{"message":"요청한 대상을 찾을 수 없습니다."}`. Unexpected application
+exceptions return `500` with `{"message":"서버 오류가 발생했습니다."}`; their causes
+are logged on the server and internal details are excluded from the response.
+
+These responses use `application/json` and UTF-8 when `Accept` is absent or
+allows JSON. Requests that exclude JSON retain the error status with an empty
+body. Existing HTTP status codes and exception headers are preserved.
+Framework errors such as 405, 406, 415, and unmapped paths retain Spring's
+handling; their bodies are outside this JSON contract. In particular, the API's
+plain-text mappings still reject JSON-only `Accept` requests with 406 before
+invoking a controller. To accept both success and error bodies, use
+`Accept: text/plain, application/json` or omit `Accept`. Success responses remain
+plain text as described above. No additional dependencies or error codes are used.
 
 ## Test and package
 
