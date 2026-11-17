@@ -48,6 +48,23 @@ and exactly `healthcheck` without quotes, JSON wrapping, spaces, or a trailing
 newline. No query parameters or request body are needed. This endpoint provides
 a basic liveness check and does not check databases or external services.
 
+```sh
+curl -i http://localhost:8080/api/animals/dog/sound
+curl -i http://localhost:8080/api/animals/cat/sound
+```
+
+`GET /api/animals/{animal}/sound` returns `200 OK` and
+`text/plain;charset=UTF-8`. The body is exactly `멍멍` for `dog` or `야옹`
+for `cat`, encoded as UTF-8 without quotes, JSON wrapping, extra spaces, or a
+trailing newline. No request body is needed.
+
+Only the lowercase identifiers `dog` and `cat` are supported. Other values,
+including `Dog`, `CAT`, `강아지`, `고양이`, and values with surrounding whitespace,
+return `404 Not Found`. A missing identifier (`/api/animals/sound`) also returns
+404. POST returns `405 Method Not Allowed`, and requesting only
+`Accept: application/json` returns `406 Not Acceptable`. Error response bodies
+are not part of the API contract.
+
 ## Test and package
 
 ```sh
@@ -56,7 +73,8 @@ java -jar target/hello-api-0.0.1-SNAPSHOT.jar
 ```
 
 Tests check the HTTP status, exact response bytes, plain-text content type,
-and application context startup with both controllers registered.
+UTF-8 animal sounds, unsupported inputs, method and content negotiation errors,
+and application context startup with all controllers registered.
 
 ## AI planning review
 
