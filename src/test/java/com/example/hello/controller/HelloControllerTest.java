@@ -42,7 +42,9 @@ class HelloControllerTest {
     @Test
     void rejectsMissingBody() throws Exception {
         mockMvc.perform(post("/api/hello").contentType("text/plain; charset=UTF-8"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().bytes("{\"message\":\"잘못된 요청입니다.\"}".getBytes(UTF_8)));
     }
 
     @ParameterizedTest
@@ -52,7 +54,9 @@ class HelloControllerTest {
         mockMvc.perform(post("/api/hello")
                         .contentType("text/plain; charset=UTF-8")
                         .content(body.getBytes(UTF_8)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().bytes("{\"message\":\"잘못된 요청입니다.\"}".getBytes(UTF_8)));
     }
 
     @ParameterizedTest
