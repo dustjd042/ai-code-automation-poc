@@ -65,6 +65,26 @@ return `404 Not Found`. A missing identifier (`/api/animals/sound`) also returns
 `Accept: application/json` returns `406 Not Acceptable`. Error response bodies
 are not part of the API contract.
 
+```sh
+curl -i -X POST http://localhost:8080/api/animals/turtle/jump-sound
+curl -i -X POST http://localhost:8080/api/animals/rabbit/jump-sound
+```
+
+`POST /api/animals/{animal}/jump-sound` returns `200 OK` and
+`text/plain;charset=UTF-8`. This implementation uses text movement sounds:
+exactly `엉금엉금` for `turtle` and `깡충깡충` for `rabbit`. These values were
+chosen because the plan left the exact strings unspecified. Responses contain
+UTF-8 bytes without quotes, JSON wrapping, extra spaces, or a trailing newline.
+The endpoint immediately returns the sound without storing state or playing audio.
+
+No request body or Content-Type is required. Any supplied body is ignored,
+regardless of its Content-Type. Only lowercase `turtle` and `rabbit` are accepted;
+other identifiers, Korean aliases, and surrounding whitespace return `404 Not Found`.
+A missing identifier (`/api/animals/jump-sound`) also returns 404.
+GET and other unsupported methods return `405 Method Not Allowed`.
+`Accept: application/json` returns `406 Not Acceptable`.
+Error response bodies are not part of the API contract.
+
 ## Test and package
 
 ```sh
